@@ -2,6 +2,10 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+const FALLBACK_SUPABASE_URL = "https://xlmfpbgelkzbrrvdwwkb.supabase.co";
+const FALLBACK_SUPABASE_KEY =
+  "sb_publishable_mTMPdoGODnpNCwzw0Y15tA_MKyamvAV";
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -12,11 +16,15 @@ export async function POST(request) {
       useWebSearch = true,
     } = body;
 
-    const geminiKey = process.env.GEMINI_API_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey =
+    const geminiKey = String(process.env.GEMINI_API_KEY || "").trim();
+    const supabaseUrl = String(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_SUPABASE_URL
+    ).trim();
+    const supabaseKey = String(
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        FALLBACK_SUPABASE_KEY
+    ).trim();
 
     if (!geminiKey) {
       return NextResponse.json(
