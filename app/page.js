@@ -18,10 +18,16 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey =
+const rawSupabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  "https://xlmfpbgelkzbrrvdwwkb.supabase.co";
+const rawSupabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  "sb_publishable_mTMPdoGODnpNCwzw0Y15tA_MKyamvAV";
+
+const supabaseUrl = String(rawSupabaseUrl || "").trim();
+const supabaseKey = String(rawSupabaseKey || "").trim();
 
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
