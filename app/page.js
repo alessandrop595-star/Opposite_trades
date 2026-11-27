@@ -18,19 +18,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const rawSupabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ||
-  "https://xlmfpbgelkzbrrvdwwkb.supabase.co";
-const rawSupabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "sb_publishable_mTMPdoGODnpNCwzw0Y15tA_MKyamvAV";
+const supabaseUrl = "https://xlmfpbgelkzbrrvdwwkb.supabase.co";
+const supabaseKey = "sb_publishable_mTMPdoGODnpNCwzw0Y15tA_MKyamvAV";
 
-const supabaseUrl = String(rawSupabaseUrl || "").trim();
-const supabaseKey = String(rawSupabaseKey || "").trim();
-
-const supabase =
-  supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function OppositeTradesStudio() {
   const [format, setFormat] = useState("reel");
@@ -56,35 +47,39 @@ export default function OppositeTradesStudio() {
   const [progress, setProgress] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [exportUrl, setExportUrl] = useState("");
+  const [exportExt, setExportExt] = useState("mp4");
 
   useEffect(() => {
     loadHistory();
   }, []);
 
   async function loadHistory() {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from("opposite_concepts")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(30);
+    try {
+      const { data, error } = await supabase
+        .from("opposite_concepts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(30);
 
-    if (!error && data && data.length > 0) {
-      const normalized = data.map((row) => ({
-        id: row.id,
-        created_at: row.created_at,
-        format: row.format,
-        ...(row.visual_spec || {}),
-        title: row.visual_spec?.title || row.title,
-        topic: row.visual_spec?.topic || row.topic,
-        angle: row.visual_spec?.angle || row.angle,
-        hook: row.visual_spec?.hook || row.hook,
-        caption: row.visual_spec?.caption || row.caption,
-      }));
-      setHistory(normalized);
-      if (!currentItem) {
-        setCurrentItem(normalized[0]);
+      if (!error && data && data.length > 0) {
+        const normalized = data.map((row) => ({
+          id: row.id,
+          created_at: row.created_at,
+          format: row.format,
+          ...(row.visual_spec || {}),
+          title: row.visual_spec?.title || row.title,
+          topic: row.visual_spec?.topic || row.topic,
+          angle: row.visual_spec?.angle || row.angle,
+          hook: row.visual_spec?.hook || row.hook,
+          caption: row.visual_spec?.caption || row.caption,
+        }));
+        setHistory(normalized);
+        if (!currentItem) {
+          setCurrentItem(normalized[0]);
+        }
       }
+    } catch (err) {
+      console.error("Errore caricamento storico:", err);
     }
   }
 
@@ -109,7 +104,14 @@ export default function OppositeTradesStudio() {
         }),
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Risposta server non valida: ${rawText.slice(0, 100)}`);
+      }
+
       if (!res.ok) {
         throw new Error(data.error || "Errore di generazione");
       }
@@ -396,11 +398,24 @@ export default function OppositeTradesStudio() {
     chunksRef.current = [];
 
     const stream = canvas.captureStream(30);
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-      ? "video/webm;codecs=vp9"
-      : "video/webm";
+    let mimeType = "";
+    let ext = "mp4";
 
-    const recorder = new MediaRecorder(stream, { mimeType });
+    if (MediaRecorder.isTypeSupported("video/mp4")) {
+      mimeType = "video/mp4";
+      ext = "mp4";
+    } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
+      mimeType = "video/webm;codecs=vp9";
+      ext = "webm";
+    } else if (MediaRecorder.isTypeSupported("video/webm")) {
+      mimeType = "video/webm";
+      ext = "webm";
+    }
+
+    setExportExt(ext);
+    const recorder = mimeType
+      ? new MediaRecorder(stream, { mimeType })
+      : new MediaRecorder(stream);
     recorderRef.current = recorder;
 
     recorder.ondataavailable = (e) => {
@@ -408,7 +423,9 @@ export default function OppositeTradesStudio() {
     };
 
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: mimeType });
+      const blob = new Blob(chunksRef.current, {
+        type: mimeType || "video/mp4",
+      });
       const url = URL.createObjectURL(blob);
       setExportUrl(url);
       setIsRecording(false);
@@ -608,7 +625,7 @@ export default function OppositeTradesStudio() {
                   <div className="text-center">
                     <a
                       href={exportUrl}
-                      download={`opposite-reel-${Date.now()}.webm`}
+                      download={`opposite-reel-${Date.now()}.${exportExt}`}
                       className="inline-block text-xs font-semibold text-emerald-400 underline"
                     >
                       Scarica video generato
